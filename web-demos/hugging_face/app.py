@@ -643,4 +643,4 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
     gr.Markdown(article)
 
 iface.queue()
-iface.launch(debug=True)
+iface.launch(debug=True, share=True)
