@@ -100,7 +100,6 @@ def get_frames_from_video(video_input, video_state):
                         gr.update(visible=True), gr.update(visible=True),\
                         gr.update(visible=True), gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True), \
-                        gr.update(visible=True), gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True, choices=[], value=[]), \
                         gr.update(visible=True, value=operation_log), gr.update(visible=True, value=operation_log)
 
