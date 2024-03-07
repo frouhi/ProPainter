@@ -199,15 +199,16 @@ def show_mask(video_state, interactive_state, mask_dropdown):
     operation_log = [("",""), ("Added masks {}. If you want to do the inpainting with current masks, please go to step3, and click the Tracking button first and then Inpainting button.".format(mask_dropdown),"Normal")]
     return select_frame, operation_log, operation_log
 
-# tracking vos
-def vos_tracking_video(video_state, interactive_state, mask_dropdown):
-    operation_log = [("",""), ("Tracking finished! Try to click the Inpainting button to get the inpainting result.","Normal")]
-    model.cutie.clear_memory()
-    if interactive_state["track_end_number"]:
-        following_frames = video_state["origin_images"][video_state["select_frame_number"]:interactive_state["track_end_number"]]
-    else:
-        following_frames = video_state["origin_images"][video_state["select_frame_number"]:]
 
+def get_template_mask(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size=80):
+    """
+        for the first chunk, we have to manually select the mask!
+        TODO: explore using masks from other videos! 
+        NOTE: the template is the "first frame annotation" used for tracking!
+        NOTE: we output chunk_size + 1, but the last one is just used for the next chunk basically
+    """
+    if chunk_id > 0:
+        return video_state["masks"][chunk_id*chunk_size]
     if interactive_state["multi_mask"]["masks"]:
         if len(mask_dropdown) == 0:
             mask_dropdown = ["mask_001"]
@@ -219,6 +220,18 @@ def vos_tracking_video(video_state, interactive_state, mask_dropdown):
         video_state["masks"][video_state["select_frame_number"]]= template_mask
     else:      
         template_mask = video_state["masks"][video_state["select_frame_number"]]
+    return template_mask
+
+
+# tracking vos
+def vos_tracking_video(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size=80):
+    # operation_log = [("",""), ("Tracking finished! Try to click the Inpainting button to get the inpainting result.","Normal")]
+    model.cutie.clear_memory()
+    start_idx = chunk_id*chunk_size
+    end_idx = (chunk_id+1)*chunk_size+1
+    following_frames = video_state["origin_images"][start_idx:end_idx] # we add one because this is the output
+
+    template_mask = get_template_mask(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size)
     fps = video_state["fps"]
 
     # operation error
@@ -230,55 +243,63 @@ def vos_tracking_video(video_state, interactive_state, mask_dropdown):
     # clear GPU memory
     model.cutie.clear_memory()
 
-    if interactive_state["track_end_number"]: 
-        video_state["masks"][video_state["select_frame_number"]:interactive_state["track_end_number"]] = masks
-        video_state["logits"][video_state["select_frame_number"]:interactive_state["track_end_number"]] = logits
-        video_state["painted_images"][video_state["select_frame_number"]:interactive_state["track_end_number"]] = painted_images
-    else:
-        video_state["masks"][video_state["select_frame_number"]:] = masks
-        video_state["logits"][video_state["select_frame_number"]:] = logits
-        video_state["painted_images"][video_state["select_frame_number"]:] = painted_images
+    video_state["masks"][start_idx:end_idx] = masks
+    video_state["logits"][start_idx:end_idx] = logits
+    video_state["painted_images"][start_idx:end_idx] = painted_images
 
-    video_output = generate_video_from_frames(video_state["painted_images"], output_path="./result/track/{}".format(video_state["video_name"]), fps=fps) # import video_input to name the output video
-    interactive_state["inference_times"] += 1
+    print(f"tracking for chunk {chunk_id} is done")
+    return video_state, interactive_state
+
+    # video_output = generate_video_from_frames(video_state["painted_images"], output_path="./result/track/{}".format(video_state["video_name"]), fps=fps) # import video_input to name the output video
+    # interactive_state["inference_times"] += 1
     
-    print("For generating this tracking result, inference times: {}, click times: {}, positive: {}, negative: {}".format(interactive_state["inference_times"], 
-                                                                                                                                           interactive_state["positive_click_times"]+interactive_state["negative_click_times"],
-                                                                                                                                           interactive_state["positive_click_times"],
-                                                                                                                                        interactive_state["negative_click_times"]))
-
-    #### shanggao code for mask save
-    if interactive_state["mask_save"]:
-        if not os.path.exists('./result/mask/{}'.format(video_state["video_name"].split('.')[0])):
-            os.makedirs('./result/mask/{}'.format(video_state["video_name"].split('.')[0]))
-        i = 0
-        print("save mask")
-        for mask in video_state["masks"]:
-            np.save(os.path.join('./result/mask/{}'.format(video_state["video_name"].split('.')[0]), '{:05d}.npy'.format(i)), mask)
-            i+=1
-        # save_mask(video_state["masks"], video_state["video_name"])
-    #### shanggao code for mask save
-    return video_output, video_state, interactive_state, operation_log, operation_log
+    # #### shanggao code for mask save
+    # if interactive_state["mask_save"]:
+    #     if not os.path.exists('./result/mask/{}'.format(video_state["video_name"].split('.')[0])):
+    #         os.makedirs('./result/mask/{}'.format(video_state["video_name"].split('.')[0]))
+    #     i = 0
+    #     print("save mask")
+    #     for mask in video_state["masks"]:
+    #         np.save(os.path.join('./result/mask/{}'.format(video_state["video_name"].split('.')[0]), '{:05d}.npy'.format(i)), mask)
+    #         i+=1
+    #     # save_mask(video_state["masks"], video_state["video_name"])
+    # #### shanggao code for mask save
+    # return video_output, video_state, interactive_state, operation_log, operation_log
 
 # inpaint 
-def inpaint_video(video_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown):
-    operation_log = [("",""), ("Inpainting finished!","Normal")]
-
-    frames = np.asarray(video_state["origin_images"])
-    fps = video_state["fps"]
-    inpaint_masks = np.asarray(video_state["masks"])
-    if len(mask_dropdown) == 0:
-        mask_dropdown = ["mask_001"]
-    mask_dropdown.sort()
-    # convert mask_dropdown to mask numbers
-    inpaint_mask_numbers = [int(mask_dropdown[i].split("_")[1]) for i in range(len(mask_dropdown))]
-    # interate through all masks and remove the masks that are not in mask_dropdown
-    unique_masks = np.unique(inpaint_masks)
-    num_masks = len(unique_masks) - 1
-    for i in range(1, num_masks + 1):
-        if i in inpaint_mask_numbers:
-            continue
-        inpaint_masks[inpaint_masks==i] = 0
+def inpaint_video(
+        video_state, 
+        resize_ratio_number, 
+        dilate_radius_number, 
+        raft_iter_number, 
+        subvideo_length_number, 
+        neighbor_length_number, 
+        ref_stride_number, 
+        chunk_id, 
+        chunk_size=80):
+    # operation_log = [("",""), ("Inpainting finished!","Normal")]
+    start_idx = chunk_id*chunk_size
+    # NOTE: we don't add one because there's no need to create an extra frame
+    # having that said, TODO: explore if generating the extra frame helps robustness
+    end_idx = (chunk_id+1)*chunk_size
+    frames = np.asarray(video_state["origin_images"][start_idx:end_idx])
+    # fps = video_state["fps"]
+    inpaint_masks = np.asarray(video_state["masks"][start_idx:end_idx])
+    # NOTE: we are ignoring the mask selection code, 
+    # because we assume the mask used for tracking is 
+    # the same as the one used for inpainting
+    # if len(mask_dropdown) == 0:
+    #     mask_dropdown = ["mask_001"]
+    # mask_dropdown.sort()
+    # # convert mask_dropdown to mask numbers
+    # inpaint_mask_numbers = [int(mask_dropdown[i].split("_")[1]) for i in range(len(mask_dropdown))]
+    # # interate through all masks and remove the masks that are not in mask_dropdown
+    # unique_masks = np.unique(inpaint_masks)
+    # num_masks = len(unique_masks) - 1
+    # for i in range(1, num_masks + 1):
+    #     if i in inpaint_mask_numbers:
+    #         continue
+    #     inpaint_masks[inpaint_masks==i] = 0
     
     # inpaint for videos
     inpainted_frames = model.baseinpainter.inpaint(frames, 
@@ -289,10 +310,58 @@ def inpaint_video(video_state, resize_ratio_number, dilate_radius_number, raft_i
                                                    subvideo_length=subvideo_length_number, 
                                                    neighbor_length=neighbor_length_number, 
                                                    ref_stride=ref_stride_number)   # numpy array, T, H, W, 3
+    print(f"inpainting for chunk {chunk_id} is done")
+    return inpainted_frames
 
+    # video_output = generate_video_from_frames(inpainted_frames, output_path="./result/inpaint/{}".format(video_state["video_name"]), fps=fps) # import video_input to name the output video
+
+    # return video_output, operation_log, operation_log
+
+def track_and_inpaint(
+        video_state, 
+        interactive_state,
+        resize_ratio_number, 
+        dilate_radius_number, 
+        raft_iter_number, 
+        subvideo_length_number, 
+        neighbor_length_number, 
+        ref_stride_number,
+        mask_dropdown,
+        chunk_size=80):
+    """
+        the tracking and inpainting are done together
+        we chunk the frames, and perform tracking and inpainting on each chunk
+        at the end, we put them together and generate the final video
+        TODO: There might be a benefit for recoverability and memory management to cache chunk results/store to memory
+        TODO: *** IMPORTANT *** we'd like to generate multiple masks together in one session, 
+            and do the inpainting for all of them together in the background
+            instead of having to generate mask for each video, inpaint, and repeat (which is very inefficient)
+    """
+    operation_log = [("",""), ("Chunked Tracking and Inpainting finished!","Normal")]
+    frame_count = len(video_state["origin_images"])
+    fps = video_state["fps"]
+    inpainted_frames = []
+    for chunk_id in np.array(range(0, frame_count, chunk_size))//chunk_size:
+        # step 1: track
+        video_state, interactive_state = vos_tracking_video(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size)
+        # step 2: inpaint
+        inpainted_frames_chunk = inpaint_video(
+            video_state, 
+            resize_ratio_number, 
+            dilate_radius_number, 
+            raft_iter_number, 
+            subvideo_length_number, 
+            neighbor_length_number, 
+            ref_stride_number, 
+            chunk_id, 
+            chunk_size
+        )
+        inpainted_frames.append(inpainted_frames_chunk)
+    print("all chunks are done")
+    # step 3: when all chunks are done, generate video from frames
     video_output = generate_video_from_frames(inpainted_frames, output_path="./result/inpaint/{}".format(video_state["video_name"]), fps=fps) # import video_input to name the output video
-
     return video_output, operation_log, operation_log
+
 
 # generate video after vos inference
 def generate_video_from_frames(frames, output_path, fps=30):
@@ -302,7 +371,7 @@ def generate_video_from_frames(frames, output_path, fps=30):
     Args:
         frames (list of numpy arrays): The frames to include in the video.
         output_path (str): The path to save the generated video.
-        fps (int, optional): The frame rate of the output video. Defaults to 30.
+        fps (int, optional): The frame rate of the output video. Defaults to 30. TODO: make sure this is the same as the input
     """
     frames = torch.from_numpy(np.asarray(frames))
     if not os.path.exists(os.path.dirname(output_path)):
@@ -332,10 +401,10 @@ def restart():
                 "masks": []
             },
             "track_end_number": None,
-        }, [[],[]], None, None, None, \
+        }, [[],[]], None, None, \
         gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False),\
-        gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), \
         gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), \
+        gr.update(visible=False), \
         gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), gr.update(visible=False), "", \
         gr.update(visible=True, value=operation_log), gr.update(visible=False, value=operation_log)
 
@@ -529,12 +598,14 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
         # output video
         step3_title = gr.Markdown("---\n## Step3: Track masks and get the inpainting result", visible=False)
         with gr.Row(equal_height=True):
-            with gr.Column(scale=2):
-                tracking_video_output = gr.Video(visible=False, elem_classes="video")
-                tracking_video_predict_button = gr.Button(value="1. Tracking", visible=False, elem_classes="margin_center")
-            with gr.Column(scale=2):
-                inpaiting_video_output = gr.Video(visible=False, elem_classes="video")
-                inpaint_video_predict_button = gr.Button(value="2. Inpainting", visible=False, elem_classes="margin_center")
+            # with gr.Column(scale=2):
+            #     tracking_video_output = gr.Video(visible=False, elem_classes="video")
+            #     tracking_video_predict_button = gr.Button(value="1. Tracking", visible=False, elem_classes="margin_center")
+            # with gr.Column(scale=2):
+            #     inpaiting_video_output = gr.Video(visible=False, elem_classes="video")
+            #     inpaint_video_predict_button = gr.Button(value="2. Inpainting", visible=False, elem_classes="margin_center")
+            inpaiting_video_output = gr.Video(visible=False, elem_classes="video")
+            track_and_inpaint_button = gr.Button(value="Tracking + Inpainting", visible=False, elem_classes="margin_center")
 
     # first step: get the video information 
     extract_frames_button.click(
@@ -544,7 +615,7 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
         ],
         outputs=[video_state, video_info, template_frame,
                  image_selection_slider, track_pause_number_slider,point_prompt, clear_button_click, Add_mask_button, template_frame,
-                 tracking_video_predict_button, tracking_video_output, inpaiting_video_output, remove_mask_button, inpaint_video_predict_button, step2_title, step3_title,mask_dropdown, run_status, run_status2]
+                 track_and_inpaint_button, inpaiting_video_output, remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, run_status2]
     )   
 
     # second step: select images from slider
@@ -575,19 +646,26 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
         outputs=[interactive_state, mask_dropdown, run_status, run_status2]
     )
 
-    # tracking video from select image and mask
-    tracking_video_predict_button.click(
-        fn=vos_tracking_video,
-        inputs=[video_state, interactive_state, mask_dropdown],
-        outputs=[tracking_video_output, video_state, interactive_state, run_status, run_status2]
-    )
-
-    # inpaint video from select image and mask
-    inpaint_video_predict_button.click(
-        fn=inpaint_video,
-        inputs=[video_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown],
+    # chunked tracking and inpainting
+    track_and_inpaint_button.click(
+        fn=track_and_inpaint,
+        inputs=[video_state, interactive_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown],
         outputs=[inpaiting_video_output, run_status, run_status2]
     )
+
+    # # tracking video from select image and mask
+    # tracking_video_predict_button.click(
+    #     fn=vos_tracking_video,
+    #     inputs=[video_state, interactive_state, mask_dropdown],
+    #     outputs=[tracking_video_output, video_state, interactive_state, run_status, run_status2]
+    # )
+
+    # # inpaint video from select image and mask
+    # inpaint_video_predict_button.click(
+    #     fn=inpaint_video,
+    #     inputs=[video_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown],
+    #     outputs=[inpaiting_video_output, run_status, run_status2]
+    # )
 
     # click to get mask
     mask_dropdown.change(
@@ -604,10 +682,10 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
             video_state,
             interactive_state,
             click_state,
-            tracking_video_output, inpaiting_video_output,
+            inpaiting_video_output,
             template_frame,
-            tracking_video_predict_button, image_selection_slider , track_pause_number_slider,point_prompt, clear_button_click, 
-            Add_mask_button, template_frame, tracking_video_predict_button, tracking_video_output, inpaiting_video_output, remove_mask_button,inpaint_video_predict_button, step2_title, step3_title, mask_dropdown, video_info, run_status, run_status2
+            track_and_inpaint_button, image_selection_slider , track_pause_number_slider,point_prompt, clear_button_click, 
+            Add_mask_button, template_frame, inpaiting_video_output, remove_mask_button, step2_title, step3_title, mask_dropdown, video_info, run_status, run_status2
         ],
         queue=False,
         show_progress=False)
@@ -619,10 +697,10 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
             video_state,
             interactive_state,
             click_state,
-            tracking_video_output, inpaiting_video_output,
+            inpaiting_video_output,
             template_frame,
-            tracking_video_predict_button, image_selection_slider , track_pause_number_slider,point_prompt, clear_button_click, 
-            Add_mask_button, template_frame, tracking_video_predict_button, tracking_video_output, inpaiting_video_output, remove_mask_button,inpaint_video_predict_button, step2_title, step3_title, mask_dropdown, video_info, run_status, run_status2
+            track_and_inpaint_button, image_selection_slider , track_pause_number_slider,point_prompt, clear_button_click, 
+            Add_mask_button, template_frame, inpaiting_video_output, remove_mask_button, step2_title, step3_title, mask_dropdown, video_info, run_status, run_status2
         ],
         queue=False,
         show_progress=False)
