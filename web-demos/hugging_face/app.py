@@ -343,6 +343,7 @@ def track_and_inpaint(
     for chunk_id in np.array(range(0, frame_count, chunk_size))//chunk_size:
         # step 1: track
         video_state, interactive_state = vos_tracking_video(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size)
+        torch.cuda.empty_cache()
         # step 2: inpaint
         inpainted_frames_chunk = inpaint_video(
             video_state, 
@@ -355,7 +356,7 @@ def track_and_inpaint(
             chunk_id, 
             chunk_size
         )
-        inpainted_frames.append(inpainted_frames_chunk)
+        inpainted_frames.extend(inpainted_frames_chunk)
     print("all chunks are done")
     # step 3: when all chunks are done, generate video from frames
     video_output = generate_video_from_frames(inpainted_frames, output_path="./result/inpaint/{}".format(video_state["video_name"]), fps=fps) # import video_input to name the output video
