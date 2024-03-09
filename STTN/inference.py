@@ -78,7 +78,7 @@ def read_frame_from_videos(vname):
     return frames       
 
 
-def run(frames, masks, out_path=None, model="sttn", ckpt="checkpoints/sttn.pth"):
+def run(npframes, npmasks, out_path=None, model="sttn", ckpt="STTN/checkpoints/sttn.pth"):
     """
         mask: masks TODO: make sure the format is correct (must be the same as read_mask)
         frames: video frames TODO: make sure the format is correct (must be the same as read_frame_from_videos)
@@ -87,8 +87,8 @@ def run(frames, masks, out_path=None, model="sttn", ckpt="checkpoints/sttn.pth")
         returns comp_ls (frames of the inpainted video)
     """
     # set up models 
-    device = torch.device("cuda:1" if torch.cuda.is_available() else "cpu")
-    net = importlib.import_module('model.' + model)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    net = importlib.import_module('STTN.model.' + model)
     model = net.InpaintGenerator().to(device)
     data = torch.load(ckpt, map_location=device)
     model.load_state_dict(data['netG'])
@@ -97,18 +97,33 @@ def run(frames, masks, out_path=None, model="sttn", ckpt="checkpoints/sttn.pth")
 
     # prepare datset, encode all frames into deep space 
     # frames = read_frame_from_videos(args.video)
+    frames = []
+    for i in range(len(npframes)):
+        frames.append(Image.fromarray(npframes[i].astype('uint8'), mode="RGB").resize((w,h)))
     video_length = len(frames)
     feats = _to_tensors(frames).unsqueeze(0)*2-1
     frames = [np.array(f).astype(np.uint8) for f in frames]
 
     # masks = read_mask(args.mask)
+    masks = []
+    npmasks = npmasks.reshape(*npmasks.shape, 1).repeat(3, axis=3)
+    npmasks = npmasks * npframes
+    for i in range(len(npmasks)):
+        m = Image.fromarray(npmasks[i].astype('uint8'), mode="RGB")
+        m = m.resize((w, h), Image.NEAREST)
+        m = np.array(m.convert('L'))
+        m = np.array(m > 0).astype(np.uint8)
+        m = cv2.dilate(m, cv2.getStructuringElement(
+            cv2.MORPH_CROSS, (3, 3)), iterations=4)
+        masks.append(Image.fromarray(m*255))
+    del npmasks, npframes
     binary_masks = [np.expand_dims((np.array(m) != 0).astype(np.uint8), 2) for m in masks]
     masks = _to_tensors(masks).unsqueeze(0)
     feats, masks = feats.to(device), masks.to(device)
     comp_frames = [None]*video_length
 
     with torch.no_grad():
-        feats = model.encoder((feats*(1-masks).float()).view(video_length, 3, h, w))
+        feats = model.encoder((feats*(1-masks).float()).view(*feats.shape[1:]))#video_length, 3, h, w))
         _, c, feat_h, feat_w = feats.size()
         feats = feats.view(1, video_length, c, feat_h, feat_w)
     # print('loading videos and masks from: {}'.format(args.video))
