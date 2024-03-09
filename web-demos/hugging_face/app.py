@@ -19,6 +19,8 @@ from track_anything import TrackingAnything
 from model.misc import get_device
 from utils.download_util import load_file_from_url
 
+from STTN.inference import run as sttn_inference
+
 
 def parse_augment():
     parser = argparse.ArgumentParser()
@@ -345,17 +347,22 @@ def track_and_inpaint(
         video_state, interactive_state = vos_tracking_video(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size)
         torch.cuda.empty_cache()
         # step 2: inpaint
-        inpainted_frames_chunk = inpaint_video(
-            video_state, 
-            resize_ratio_number, 
-            dilate_radius_number, 
-            raft_iter_number, 
-            subvideo_length_number, 
-            neighbor_length_number, 
-            ref_stride_number, 
-            chunk_id, 
-            chunk_size
-        )
+        # inpainted_frames_chunk = inpaint_video(
+        #     video_state, 
+        #     resize_ratio_number, 
+        #     dilate_radius_number, 
+        #     raft_iter_number, 
+        #     subvideo_length_number, 
+        #     neighbor_length_number, 
+        #     ref_stride_number, 
+        #     chunk_id, 
+        #     chunk_size
+        # )
+        start_idx = chunk_id*chunk_size
+        end_idx = (chunk_id+1)*chunk_size
+        frames = np.asarray(video_state["origin_images"][start_idx:end_idx])
+        inpaint_masks = np.asarray(video_state["masks"][start_idx:end_idx])
+        inpainted_frames_chunk = sttn_inference(frames, inpaint_masks)
         inpainted_frames.extend(inpainted_frames_chunk)
     print("all chunks are done")
     # step 3: when all chunks are done, generate video from frames
