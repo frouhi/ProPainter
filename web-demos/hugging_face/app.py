@@ -38,8 +38,10 @@ def parse_augment():
 
     return args
 
-def get_video_path_generator():
+def get_video_path_generator(only_if_has_mask=False):
     video_paths = glob(f"{args.data_root_path}/training_session_*/*.mp4")
+    if only_if_has_mask:
+        video_paths = [vp for vp in video_paths if os.path.exists(vp.replace(".mp4", ".npy"))]
     for video_path in video_paths:
         yield video_path
 
@@ -377,9 +379,9 @@ def track_and_inpaint_all(
         chunk_size=80,
         inpainting_model="ProPainter"):
     global video_path_generator
-    vid_count = len(list(get_video_path_generator()))
+    vid_count = len(list(get_video_path_generator(only_if_has_mask=True)))
     progress = gr.Progress()
-    video_path_generator = get_video_path_generator()
+    video_path_generator = get_video_path_generator(only_if_has_mask=True)
     for i in progress.tqdm(range(vid_count)):
         video_state, video_info, template_frame, image_selection_slider, track_pause_number_slider, \
             point_prompt, clear_button_click, Add_mask_button, template_frame, track_and_inpaint_button, \
