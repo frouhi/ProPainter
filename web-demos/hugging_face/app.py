@@ -557,8 +557,8 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
         # output video
         step3_title = gr.Markdown("---\n## Step3: Track masks and get the inpainting result", visible=False)
         with gr.Row(equal_height=True):
-            inpaiting_video_output = gr.Video(visible=False, elem_classes="video")
-            track_and_inpaint_button = gr.Button(value="Track & Inpaint All", visible=False, elem_classes="margin_center")
+            inpaiting_video_output = gr.Video(visible=True, elem_classes="video")
+            track_and_inpaint_button = gr.Button(value="Track & Inpaint All", visible=True, elem_classes="margin_center")
 
     # first step: get the video information 
     extract_frames_button.click( 
