@@ -111,7 +111,7 @@ def get_frames_from_video(video_state):
         "select_frame_number": 0,
         "fps": fps
         }
-    interactive_state = gr.State({
+    interactive_state = {
         "inference_times": 0,
         "negative_click_times" : 0,
         "positive_click_times": 0,
@@ -121,8 +121,7 @@ def get_frames_from_video(video_state):
             "masks": []
         },
         "track_end_number": None,
-        }
-    )
+    }
     video_info = "Video Name: {},\nFPS: {},\nTotal Frames: {},\nImage Size:{}".format(video_state["video_name"], round(video_state["fps"], 0), len(frames), image_size)
     model.samcontroler.sam_controler.reset_image() 
     model.samcontroler.sam_controler.set_image(video_state["origin_images"][0])
