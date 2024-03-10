@@ -45,6 +45,9 @@ def get_video_path_generator(only_if_has_mask=False):
             vp for vp in video_paths if \
                 os.path.exists(vp.replace(".mp4", ".npy")) and \
                 not os.path.exists(vp.replace(".mp4", "_inpainted.mp4"))]
+    else:
+        # in this case we'd like the ones without a mask (so we can generate a mask for them)
+        video_paths = [vp for vp in video_paths if not os.path.exists(vp.replace(".mp4", ".npy"))]
     for video_path in video_paths:
         yield video_path
 
