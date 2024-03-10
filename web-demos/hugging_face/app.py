@@ -41,7 +41,10 @@ def parse_augment():
 def get_video_path_generator(only_if_has_mask=False):
     video_paths = glob(f"{args.data_root_path}/training_session_*/*.mp4")
     if only_if_has_mask:
-        video_paths = [vp for vp in video_paths if os.path.exists(vp.replace(".mp4", ".npy"))]
+        video_paths = [
+            vp for vp in video_paths if \
+                os.path.exists(vp.replace(".mp4", ".npy")) and \
+                not os.path.exists(vp.replace(".mp4", "_inpainted.mp4"))]
     for video_path in video_paths:
         yield video_path
 
@@ -386,8 +389,8 @@ def track_and_inpaint_all(
         video_state, video_info, template_frame, image_selection_slider, track_pause_number_slider, \
             point_prompt, clear_button_click, Add_mask_button, template_frame, track_and_inpaint_button, \
             inpaiting_video_output, remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, \
-            run_status2 =get_frames_from_video(video_state)
-        inpaiting_video_output, run_status, run_status2 = track_and_inpaint(video_state, interactive_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown, chunk_size, inpainting_model),
+            run_status2 = get_frames_from_video(video_state)
+        inpaiting_video_output, run_status, run_status2 = track_and_inpaint(video_state, interactive_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown, chunk_size, inpainting_model)
     return inpaiting_video_output, run_status, run_status2
 
 
