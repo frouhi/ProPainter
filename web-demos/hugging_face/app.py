@@ -20,6 +20,7 @@ from model.misc import get_device
 from utils.download_util import load_file_from_url
 
 from STTN.inference import run as sttn_inference
+from STTN.inference import load_model as load_sttn_model
 
 
 def parse_augment():
@@ -328,7 +329,8 @@ def track_and_inpaint(
         neighbor_length_number, 
         ref_stride_number,
         mask_dropdown,
-        chunk_size=80):
+        chunk_size=80,
+        inpainting_model="sttn"):
     """
         the tracking and inpainting are done together
         we chunk the frames, and perform tracking and inpainting on each chunk
@@ -342,27 +344,30 @@ def track_and_inpaint(
     frame_count = len(video_state["origin_images"])
     fps = video_state["fps"]
     inpainted_frames = []
+    model = load_sttn_model() if inpainting_model == "sttn" else None
     for chunk_id in np.array(range(0, frame_count, chunk_size))//chunk_size:
         # step 1: track
         video_state, interactive_state = vos_tracking_video(video_state, interactive_state, mask_dropdown, chunk_id, chunk_size)
         torch.cuda.empty_cache()
         # step 2: inpaint
-        # inpainted_frames_chunk = inpaint_video(
-        #     video_state, 
-        #     resize_ratio_number, 
-        #     dilate_radius_number, 
-        #     raft_iter_number, 
-        #     subvideo_length_number, 
-        #     neighbor_length_number, 
-        #     ref_stride_number, 
-        #     chunk_id, 
-        #     chunk_size
-        # )
-        start_idx = chunk_id*chunk_size
-        end_idx = (chunk_id+1)*chunk_size
-        frames = np.asarray(video_state["origin_images"][start_idx:end_idx])
-        inpaint_masks = np.asarray(video_state["masks"][start_idx:end_idx])
-        inpainted_frames_chunk = sttn_inference(frames, inpaint_masks)
+        if inpainting_model == "sttn":
+            start_idx = chunk_id*chunk_size
+            end_idx = (chunk_id+1)*chunk_size
+            frames = np.asarray(video_state["origin_images"][start_idx:end_idx])
+            inpaint_masks = np.asarray(video_state["masks"][start_idx:end_idx])
+            inpainted_frames_chunk = sttn_inference(model, frames, inpaint_masks)
+        else:
+            inpainted_frames_chunk = inpaint_video(
+                video_state, 
+                resize_ratio_number, 
+                dilate_radius_number, 
+                raft_iter_number, 
+                subvideo_length_number, 
+                neighbor_length_number, 
+                ref_stride_number, 
+                chunk_id, 
+                chunk_size
+            )
         inpainted_frames.extend(inpainted_frames_chunk)
     print("all chunks are done")
     # step 3: when all chunks are done, generate video from frames

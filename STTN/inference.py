@@ -48,45 +48,8 @@ def get_ref_index(neighbor_ids, length):
     return ref_index
 
 
-# read frame-wise masks 
-def read_mask(mpath):
-    masks = []
-    mnames = os.listdir(mpath)
-    mnames.sort()
-    for m in mnames: 
-        m = Image.open(os.path.join(mpath, m))
-        m = m.resize((w, h), Image.NEAREST)
-        m = np.array(m.convert('L'))
-        m = np.array(m > 0).astype(np.uint8)
-        m = cv2.dilate(m, cv2.getStructuringElement(
-            cv2.MORPH_CROSS, (3, 3)), iterations=4)
-        masks.append(Image.fromarray(m*255))
-    return masks
-
-
-#  read frames from video 
-def read_frame_from_videos(vname):
-    frames = []
-    vidcap = cv2.VideoCapture(vname)
-    success, image = vidcap.read()
-    count = 0
-    while success:
-        image = Image.fromarray(cv2.cvtColor(image, cv2.COLOR_BGR2RGB))
-        frames.append(image.resize((w,h)))
-        success, image = vidcap.read()
-        count += 1
-    return frames       
-
-
-def run(npframes, npmasks, out_path=None, model="sttn", ckpt="STTN/checkpoints/sttn.pth"):
-    """
-        mask: masks TODO: make sure the format is correct (must be the same as read_mask)
-        frames: video frames TODO: make sure the format is correct (must be the same as read_frame_from_videos)
-        out_path: video is saved here! If its None, no video is saved
-
-        returns comp_ls (frames of the inpainted video)
-    """
-    # set up models 
+def load_model(model="sttn", ckpt="STTN/checkpoints/sttn.pth"):
+    # load the models 
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     net = importlib.import_module('STTN.model.' + model)
     model = net.InpaintGenerator().to(device)
@@ -94,7 +57,17 @@ def run(npframes, npmasks, out_path=None, model="sttn", ckpt="STTN/checkpoints/s
     model.load_state_dict(data['netG'])
     print('loading from: {}'.format(ckpt))
     model.eval()
+    return model
 
+
+def run(model, npframes, npmasks, out_path=None):
+    """
+        mask: masks TODO: make sure the format is correct (must be the same as read_mask)
+        frames: video frames TODO: make sure the format is correct (must be the same as read_frame_from_videos)
+        out_path: video is saved here! If its None, no video is saved
+
+        returns comp_ls (frames of the inpainted video)
+    """
     # prepare datset, encode all frames into deep space 
     # frames = read_frame_from_videos(args.video)
     frames = []
