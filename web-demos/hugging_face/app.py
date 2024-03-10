@@ -111,10 +111,23 @@ def get_frames_from_video(video_state):
         "select_frame_number": 0,
         "fps": fps
         }
+    interactive_state = gr.State({
+        "inference_times": 0,
+        "negative_click_times" : 0,
+        "positive_click_times": 0,
+        "mask_save": args.mask_save,
+        "multi_mask": {
+            "mask_names": [],
+            "masks": []
+        },
+        "track_end_number": None,
+        }
+    )
     video_info = "Video Name: {},\nFPS: {},\nTotal Frames: {},\nImage Size:{}".format(video_state["video_name"], round(video_state["fps"], 0), len(frames), image_size)
     model.samcontroler.sam_controler.reset_image() 
     model.samcontroler.sam_controler.set_image(video_state["origin_images"][0])
     return video_state, video_info, video_state["origin_images"][0], gr.update(visible=True, maximum=len(frames), value=1), gr.update(visible=True, maximum=len(frames), value=len(frames)), \
+                        interactive_state, gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True), \
@@ -390,7 +403,7 @@ def track_and_inpaint_all(
     video_path_generator = get_video_path_generator(only_if_has_mask=True)
     for i in progress.tqdm(range(vid_count)):
         video_state, video_info, template_frame, image_selection_slider, track_pause_number_slider, \
-            point_prompt, clear_button_click, Add_mask_button, template_frame, track_and_inpaint_button, \
+            _, _, point_prompt, clear_button_click, Add_mask_button, template_frame, track_and_inpaint_button, \
             inpaiting_video_output, remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, \
             run_status2 = get_frames_from_video(video_state)
         inpaiting_video_output, run_status, run_status2 = track_and_inpaint(video_state, interactive_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown, chunk_size, inpainting_model)
@@ -574,7 +587,7 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
             video_state
         ],
         outputs=[video_state, video_info, template_frame,
-                 image_selection_slider, track_pause_number_slider,point_prompt, clear_button_click, Add_mask_button, template_frame,
+                 image_selection_slider, track_pause_number_slider, interactive_state, mask_dropdown, point_prompt, clear_button_click, Add_mask_button, template_frame,
                  track_and_inpaint_button, inpaiting_video_output, remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, run_status2]
     )   
 
