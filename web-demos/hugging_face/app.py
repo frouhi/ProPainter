@@ -62,7 +62,7 @@ def get_prompt(click_state, click_input):
     return prompt
 
 # extract frames from upload video
-def get_frames_from_video(video_path_generator, video_state):
+def get_frames_from_video(video_state):
     """
     Args:
         video_path:str
@@ -360,7 +360,7 @@ def track_and_inpaint(
         inpainted_frames.extend(inpainted_frames_chunk)
     print("all chunks are done")
     # step 3: when all chunks are done, generate video from frames
-    video_output = generate_video_from_frames(inpainted_frames, output_path="./result/inpaint/{}".format(video_state["video_name"]), fps=fps) # import video_input to name the output video
+    video_output = generate_video_from_frames(inpainted_frames, output_path=video_state["video_path"].replace(".mp4", "_inpainted.mp4"), fps=fps) # import video_input to name the output video
     return video_output, operation_log, operation_log
 
 
@@ -376,6 +376,7 @@ def track_and_inpaint_all(
         mask_dropdown,
         chunk_size=80,
         inpainting_model="ProPainter"):
+    global video_path_generator
     vid_count = len(list(get_video_path_generator()))
     progress = gr.Progress()
     video_path_generator = get_video_path_generator()
@@ -562,7 +563,7 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
     extract_frames_button.click( 
         fn=get_frames_from_video,
         inputs=[
-            video_path_generator, video_state
+            video_state
         ],
         outputs=[video_state, video_info, template_frame,
                  image_selection_slider, track_pause_number_slider,point_prompt, clear_button_click, Add_mask_button, template_frame,
