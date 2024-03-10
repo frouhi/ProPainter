@@ -199,7 +199,7 @@ def remove_multi_mask(interactive_state, mask_dropdown):
     return interactive_state, gr.update(choices=[],value=[]), operation_log, operation_log
 
 def save_and_show_mask(video_state, interactive_state, mask_dropdown):
-    save_mask(video_state, mask_dropdown)
+    save_mask(video_state, interactive_state, mask_dropdown)
     mask_dropdown.sort()
     select_frame = video_state["origin_images"][video_state["select_frame_number"]]
     for i in range(len(mask_dropdown)):
@@ -211,7 +211,7 @@ def save_and_show_mask(video_state, interactive_state, mask_dropdown):
     return select_frame, operation_log, operation_log
 
 
-def save_mask(video_state, mask_dropdown):
+def save_mask(video_state, interactive_state, mask_dropdown):
     if interactive_state["multi_mask"]["masks"]:
         if len(mask_dropdown) == 0:
             mask_dropdown = ["mask_001"]
