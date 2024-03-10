@@ -112,7 +112,6 @@ def get_frames_from_video(video_state):
                         gr.update(visible=True), gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True),\
                         gr.update(visible=True), gr.update(visible=True), \
-                        gr.update(visible=True), gr.update(visible=True), \
                         gr.update(visible=True), gr.update(visible=True, choices=[], value=[]), \
                         gr.update(visible=True, value=operation_log), gr.update(visible=True, value=operation_log)
 
@@ -569,7 +568,7 @@ with gr.Blocks(theme=gr.themes.Monochrome(), css=css) as iface:
         ],
         outputs=[video_state, video_info, template_frame,
                  image_selection_slider, track_pause_number_slider,point_prompt, clear_button_click, Add_mask_button, template_frame,
-                 track_and_inpaint_button, inpaiting_video_output, remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, run_status2]
+                 remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, run_status2]
     )   
 
     # second step: select images from slider
