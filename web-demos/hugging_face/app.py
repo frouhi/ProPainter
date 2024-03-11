@@ -81,6 +81,7 @@ def get_frames_from_video(video_state):
         [[0:nearest_frame], [nearest_frame:], nearest_frame]
     """
     video_path = next(video_path_generator)
+    print("[LOG]: loading video:", video_path)
     frames = []
     user_name = time.time()
     operation_log = [("[Must Do]", "Click image"), (": Video uploaded! Try to click the image shown in step2 to add masks.\n", None)]
