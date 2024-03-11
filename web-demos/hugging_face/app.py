@@ -402,7 +402,7 @@ def track_and_inpaint_all(
     video_path_generator = get_video_path_generator(only_if_has_mask=True)
     for i in progress.tqdm(range(vid_count)):
         video_state, video_info, template_frame, image_selection_slider, track_pause_number_slider, \
-            _, _, point_prompt, clear_button_click, Add_mask_button, template_frame, track_and_inpaint_button, \
+            interactive_state, _, point_prompt, clear_button_click, Add_mask_button, template_frame, track_and_inpaint_button, \
             inpaiting_video_output, remove_mask_button, step2_title, step3_title,mask_dropdown, run_status, \
             run_status2 = get_frames_from_video(video_state)
         inpaiting_video_output, run_status, run_status2 = track_and_inpaint(video_state, interactive_state, resize_ratio_number, dilate_radius_number, raft_iter_number, subvideo_length_number, neighbor_length_number, ref_stride_number, mask_dropdown, chunk_size, inpainting_model)
